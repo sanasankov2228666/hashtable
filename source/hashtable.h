@@ -3,7 +3,7 @@
 
 #include "../list/list.h"
 
-#define  SIZE_TABLE 20
+#define  SIZE_TABLE 4001
 #define  DFLT_SIZE_CLSN 3
 
 typedef size_t (*hash_func) (const char*); 

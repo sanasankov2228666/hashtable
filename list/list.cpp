@@ -1,10 +1,13 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
+#include <immintrin.h>
 
 #include "list.h"
 #include "checker.h"
 #include "../source/config.h"
+
+#define MAX_WORD_SIZE
 
 // =====================================================================================================================================
 //                                                   ФУНЦИИ СПИСКА
@@ -123,9 +126,16 @@ error_t insert_begin(list_s* list, const char* word)
     }
 
     size_t index = list->free_i;
-
     list->free_i = list->next[list->free_i];
-    list->data[index].word  = strdup (word);
+
+    char* word32 = (char*) calloc (32, sizeof (char));
+    if (!word32)
+    {
+        D_PRINT ("ERROR in calloc returned adres\n");
+        return ERROR;
+    }
+
+    list->data[index].word  = strncpy (word32, word, 31);
     list->data[index].count = 1;
 
     size_t old_head = get_head (list);
@@ -241,15 +251,23 @@ size_t get_tail (list_s* list)
     return list->prev[0];
 }
 
-size_t list_search (list_s* list, const char* val)
+size_t list_search (list_s* list, const char* word)
 {
-    size_t curr = list->next[0];
+    size_t curr = get_head (list);
 
+    char word_buf[32] = {};
+    strncpy (word_buf, word, 31);
+
+    __m256i v_word = _mm256_loadu_si256 ( (__m256i*) word_buf);
+    
     while (curr != 0)
     {
-        if (list->data[curr].word && strcmp (val, list->data[curr].word) == 0)
+        __m256i v_list_word = _mm256_loadu_si256 ( (__m256i*) list->data[curr].word);
+        __m256i cmp = _mm256_cmpeq_epi8 (v_word, v_list_word);
+
+        if (_mm256_movemask_epi8 (cmp) == 0xFFFFFFFF)
             return curr;
-        
+
         curr = list->next[curr];
     }
 

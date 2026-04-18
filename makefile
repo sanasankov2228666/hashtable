@@ -10,5 +10,5 @@ all: table
 
 table: $(SOURCES)
 	@echo "=== Compiling front ==="
-	g++ source/main.cpp $(SOURCES) -O3 -o hashtable
+	g++ source/main.cpp $(SOURCES) -mavx2 -O3 -o hashtable
 	@echo "=== Compilation complete ==="
