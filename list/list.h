@@ -29,7 +29,7 @@ struct list
 
    size_t free_i = 0; 
 
-   bool is_active = false;
+   int is_active = false;
 
    size_t error  = 00000000;
 };

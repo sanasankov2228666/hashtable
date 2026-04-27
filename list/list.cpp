@@ -48,7 +48,7 @@ error_t list_creator(list_s* list, size_t capacity)
         list->prev[i] = PZN;
     }
 
-    list->is_active = true;
+    list->is_active = 1;
 
     VERIFY;
 
@@ -236,7 +236,6 @@ error_t delete_end(list_s* list)
     return SUCCSES;
 }
 
-
 // ====================================================================================================================================
 
 //!обращение к head
@@ -255,18 +254,25 @@ size_t list_search (list_s* list, const char* word)
 {
     size_t curr = get_head (list);
 
-    char word_buf[32] = {};
-    strncpy (word_buf, word, 31);
-
-    __m256i v_word = _mm256_loadu_si256 ( (__m256i*) word_buf);
+    #ifdef STRCMP_OPT
+        __m256i v_word = _mm256_loadu_si256 ( (__m256i*) word);
+    #endif
     
+    list_t* cur_data = list->data;
+
     while (curr != 0)
     {
-        __m256i v_list_word = _mm256_loadu_si256 ( (__m256i*) list->data[curr].word);
-        __m256i cmp = _mm256_cmpeq_epi8 (v_word, v_list_word);
+        #ifdef STRCMP_OPT
+        
+            __m256i v_list_word = _mm256_loadu_si256 ( (__m256i*) cur_data[curr].word);
+            __m256i cmp = _mm256_cmpeq_epi8 (v_word, v_list_word);
 
-        if (_mm256_movemask_epi8 (cmp) == 0xFFFFFFFF)
-            return curr;
+            if (_mm256_movemask_epi8 (cmp) == 0xFFFFFFFF)
+                return curr;
+
+        #else 
+            if (strcmp (word, list->data[curr].word) == 0) return curr;
+        #endif
 
         curr = list->next[curr];
     }

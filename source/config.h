@@ -16,4 +16,21 @@
     #define VERIFY //
 #endif
 
+#ifndef OPT
+    #define OPT 1
+#endif
+
+#if OPT == 0
+    #define NO_OPT
+#elif OPT == 1
+    #define STRCMP_OPT
+#elif OPT == 2
+    #define CRC_32_OPT
+    #define STRCMP_OPT
+#elif OPT == 3
+    #define ASM_INLINE
+    #define CRC_32_OPT
+    #define STRCMP_OPT
+#endif
+
 #endif

@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
-#include <assert.h>
 #include <ctype.h>
 
+#include "rewrite_aling_file.h"
 #include "config.h"
 #include "hashtable.h"
 #include "../str_funcs/str_func.h"
@@ -48,7 +48,14 @@ error_t hash_table_deleter (HashTable* hashtable)
 //! фукнция добавления элемента в таблицу
 error_t hash_table_add (HashTable* hashtable, char* word)
 {
-    size_t index = hashtable->func (word) % SIZE_TABLE;
+    #ifdef CRC_32_OPT
+        size_t hash  = hashtable->func (word, strlen (word));
+    #else
+        size_t hash  = hashtable->func (word);
+    #endif
+
+    size_t index = hash % SIZE_TABLE;
+
     list_s* cur_list = &hashtable->hash[index];
 
     if (!cur_list->is_active)
@@ -111,18 +118,41 @@ error_t hash_table_add_file (HashTable* hashtable, FILE* fp)
 //! функция поиска в хэш таблице
 search hash_table_search (HashTable* hashtable, char* word)
 {
-    size_t index = hashtable->func (word) % SIZE_TABLE;
+    #ifdef CRC_32_OPT
+        size_t len   = strlen (word);
+        size_t index = hashtable->func (word, len) % SIZE_TABLE;
+    #else
+        size_t index = hashtable->func (word) % SIZE_TABLE;
+    #endif
+
+    #ifdef ASM_INLINE
+        __asm__ volatile (
+            "prefetcht0 %[bucket]\n\t"
+            "prefetcht0 %[data_ptr]\n\t"
+            :
+            : [bucket]   "m" (hashtable->hash[index]),
+            [data_ptr] "m" (hashtable->hash[index].data[0])
+        );
+    #endif
+
     search elem = {};
-    
-    if (!hashtable->hash[index].data)
+
+    #ifndef ASM_INLINE
+        elem.table_i   = index;
+    #endif
+
+    if (!hashtable->hash[index].is_active)
         return not_found ();
     
-    elem.table_i  = index;
+    #ifndef ASM_INLINE
+        elem.table_i   = index;
+    #endif
+
     list* cur_list = &hashtable->hash[index];
 
     size_t search = list_search (cur_list, word);
     if (search == PZN) return not_found ();
-
+    
     elem.list_i = search;
     return elem;
 }
@@ -177,20 +207,46 @@ size_t hash_func_6 (const char* word)
     return hash;
 }
 
-size_t hash_func_crc32 (const char* word)
-{
-    uint32_t crc = 0xFFFFFFFF;
-    
-    size_t length = strlen (word);
+#ifndef CRC_32_OPT
 
-    for (size_t i = 0; i < length; i++)
+    // crc 32 функция
+    size_t hash_func_crc32 (const char* word)
     {
-        unsigned char table_index = (crc ^ word[i]) & 0xFF;
-        crc = (crc >> 8) ^ crc32_table[table_index];
+        uint32_t crc = 0xFFFFFFFF;
+        
+        size_t length = strlen (word);
+
+        for (size_t i = 0; i < length; i++)
+        {
+            unsigned char table_index = (crc ^ word[i]) & 0xFF;
+            crc = (crc >> 8) ^ crc32_table[table_index];
+        }
+
+        return (size_t) crc ^ 0xFFFFFFFF;
     }
 
-    return (size_t) crc ^ 0xFFFFFFFF;
-}
+    // Вычисление таблицы для crc32
+    void init_crc32_table (void)
+    {
+        uint32_t polynomial = 0xEDB88320;
+
+        for (uint32_t i = 0; i < 256; i++)
+        {
+            uint32_t crc = i;
+
+            for (int j = 0; j < 8; j++)
+            {
+                if (crc & 1)
+                    crc = (crc >> 1) ^ polynomial;
+
+                else crc >>= 1;
+            }
+
+            crc32_table[i] = crc;
+        }
+    }
+
+#endif
 
 // =================================================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ========================================================
 
@@ -208,40 +264,4 @@ search not_found (void)
 {
     search not_found = {PZN, PZN};
     return not_found;
-}
-
-void init_crc32_table (void)
-{
-    uint32_t polynomial = 0xEDB88320;
-
-    for (uint32_t i = 0; i < 256; i++)
-    {
-        uint32_t crc = i;
-
-        for (int j = 0; j < 8; j++)
-        {
-            if (crc & 1)
-                crc = (crc >> 1) ^ polynomial;
-
-            else crc >>= 1;
-        }
-
-        crc32_table[i] = crc;
-    }
-}
-
-char* find_word_begin(char* buffer)
-{
-    while (*buffer != '\0' && !isalnum(*buffer))
-        buffer++;
-
-    return buffer;
-}
-
-char* find_word_end(char* buffer)
-{
-    while (*buffer != '\0' && isalnum(*buffer))
-        buffer++;
-
-    return buffer;
 }
