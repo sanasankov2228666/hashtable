@@ -126,12 +126,12 @@ search hash_table_search (HashTable* hashtable, char* word)
     #endif
 
     #ifdef ASM_INLINE
-        __asm__ volatile (
+        asm (
             "prefetcht0 %[bucket]\n\t"
             "prefetcht0 %[data_ptr]\n\t"
             :
             : [bucket]   "m" (hashtable->hash[index]),
-            [data_ptr] "m" (hashtable->hash[index].data[0])
+              [data_ptr] "m" (hashtable->hash[index].data[0])
         );
     #endif
 
