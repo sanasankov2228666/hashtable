@@ -127,10 +127,10 @@ search hash_table_search (HashTable* hashtable, char* word)
 
     #ifdef ASM_INLINE
         asm (
-            "prefetcht0 %[bucket]\n\t"
+            "prefetcht0 %[list]\n\t"
             "prefetcht0 %[data_ptr]\n\t"
             :
-            : [bucket]   "m" (hashtable->hash[index]),
+            : [list]   "m" (hashtable->hash[index]),
               [data_ptr] "m" (hashtable->hash[index].data[0])
         );
     #endif

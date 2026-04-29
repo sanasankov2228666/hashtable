@@ -27,14 +27,14 @@ int main (void)
     FILE* fp_add = fopen ("textfile.txt", "r");
     if (!fp_add) return 1;
     
-    for (int i = 0; i < 6; i++)
+    for (int i = 0; i < 7; i++)
     {
         hash_table_add_file (&tables [i], fp_add);
     }
 
     // =============== ДАМПЫ ===================
  
-    for (int i = 0; i < 6; i++)
+    for (int i = 0; i < 7; i++)
     {
         char str [30] = {};
         snprintf (str, 30, "hash_table_%d", i + 1);
@@ -44,7 +44,7 @@ int main (void)
 
     // =========== УДАЛЕНИЕ ТАБЛИЦ =============
 
-    for (int i = 0; i < 6; i++)
+    for (int i = 0; i < 7; i++)
     {
         hash_table_deleter (&tables [i]);
     }

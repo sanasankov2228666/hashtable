@@ -82,6 +82,9 @@ hash_func_rol (char const*): (O3)
         movsx   rax, byte ptr [rdi + 1]
         xor     rax, rcx
         ret
+.LBB0_1:
+        xor     eax, eax
+        ret
 ```
 
 ```asm
@@ -93,6 +96,9 @@ hash_func_ror (char const*): (O3)
         movzx   ecx, al
         movsx   rax, byte ptr [rdi + 1]
         xor     rax, rcx
+        ret
+.LBB2_1:
+        xor     eax, eax
         ret
 ```
 
