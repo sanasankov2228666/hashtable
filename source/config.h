@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <time.h>
 
-//#define DEBUG
+// #define DEBUG
 
 #ifdef DEBUG
     #define D_PRINT(...) printf("In function %s, %s:%d\n", __func__, __FILE__, __LINE__);\

@@ -9,10 +9,10 @@ int main (void)
 {
 
     #ifdef CRC_32_OPT
-        HashTable hashtable_crc32 = hash_table_constructor (my_crc32);
+        HashTable hashtable_crc32 = hash_table_constructor (my_crc32, 4001);
     #else
         init_crc32_table ();
-        HashTable hashtable_crc32 = hash_table_constructor (hash_func_crc32);
+        HashTable hashtable_crc32 = hash_table_constructor (hash_func_crc32, 4001);
     #endif
 
     // =============================================================

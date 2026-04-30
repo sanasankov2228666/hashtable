@@ -9,22 +9,24 @@
 #include "hashtable.h"
 #include "../str_funcs/str_func.h"
 
-uint32_t crc32_table[256];
+uint32_t crc32_table[256] = {};
 
 // ===================================================== КОНСТРУКТОР И ДЕЛИТЕР ========================================================
 
 //! функция инцилизации структуры таблицы
-HashTable hash_table_constructor (hash_func func)
+HashTable hash_table_constructor (hash_func func, size_t size)
 {
     HashTable table = {};
     table.func = func;
 
-    table.hash = (list_s*) calloc (SIZE_TABLE, sizeof (list_s));
+    table.hash = (list_s*) calloc (size, sizeof (list_s));
     if (!table.hash)
     {
         D_PRINT ("ERROR in creating table\n");
         table.errors = ERROR;
     }
+
+    table.size = size;
 
     return table;
 }
@@ -32,7 +34,7 @@ HashTable hash_table_constructor (hash_func func)
 //! функция удаления таблицы
 error_t hash_table_deleter (HashTable* hashtable)
 {
-    for (int i = 0; i < SIZE_TABLE; i++)
+    for (int i = 0; i < hashtable->size; i++)
     {
         if (hashtable->hash[i].is_active)
             list_deleter (&hashtable->hash[i]);
@@ -54,7 +56,7 @@ error_t hash_table_add (HashTable* hashtable, char* word)
         size_t hash  = hashtable->func (word);
     #endif
 
-    size_t index = hash % SIZE_TABLE;
+    size_t index = hash % hashtable->size;
 
     list_s* cur_list = &hashtable->hash[index];
 
@@ -120,9 +122,9 @@ search hash_table_search (HashTable* hashtable, char* word)
 {
     #ifdef CRC_32_OPT
         size_t len   = strlen (word);
-        size_t index = hashtable->func (word, len) % SIZE_TABLE;
+        size_t index = hashtable->func (word, len) % hashtable->size;
     #else
-        size_t index = hashtable->func (word) % SIZE_TABLE;
+        size_t index = hashtable->func (word) % hashtable->size;
     #endif
 
     #ifdef ASM_INLINE
@@ -130,7 +132,7 @@ search hash_table_search (HashTable* hashtable, char* word)
             "prefetcht0 %[list]\n\t"
             "prefetcht0 %[data_ptr]\n\t"
             :
-            : [list]   "m" (hashtable->hash[index]),
+            : [list]     "m" (hashtable->hash[index]),
               [data_ptr] "m" (hashtable->hash[index].data[0])
         );
     #endif
@@ -159,23 +161,23 @@ search hash_table_search (HashTable* hashtable, char* word)
 
 // ======================================================= ХЭШ ФУНКЦИИ ==============================================================
 
-size_t hash_func_1 (const char* word)
+size_t hash_func_1or0 (const char* word)
 {
     return *word > 90;
 }
 
-size_t hash_func_2 (const char* word)
+size_t hash_func_frst_ltr (const char* word)
 {
     if (!word) return 0;
     return (size_t) *word;
 }
 
-size_t hash_func_3 (const char* word)
+size_t hash_func_strlen (const char* word)
 {
     return strlen (word);
 }
 
-size_t hash_func_4 (const char* word)
+size_t hash_func_asci_sum (const char* word)
 {
     size_t let_sum = 0;
     
@@ -185,7 +187,7 @@ size_t hash_func_4 (const char* word)
     return let_sum;
 }
 
-size_t hash_func_5 (const char* word)
+size_t hash_func_rol (const char* word)
 {
     size_t hash = word[0];
     if (hash == 0) return hash;
@@ -196,7 +198,7 @@ size_t hash_func_5 (const char* word)
     return hash;
 }
 
-size_t hash_func_6 (const char* word)
+size_t hash_func_ror (const char* word)
 {
     size_t hash = word[0];
     if (hash == 0) return hash;

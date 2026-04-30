@@ -9,7 +9,7 @@
 #include "../list/checker.h"
 
 #define COMMAND_LEN 100
-#define HTML_FILENAME_LEN 100
+#define FILENAME_LEN 100
 #define PATH_LEN 100
 
 // ====================================================== ДАМП ХЭШ ТАБЛИЦЫ ===============================================================
@@ -24,27 +24,51 @@ error_t hashtable_dump (HashTable* hashtable, const char* dump_name)
     }
 
     char path[PATH_LEN] = {};
-    char html_filename[HTML_FILENAME_LEN] = {};
-    
+    char plot_filename[FILENAME_LEN] = {};
+    char data_filename[FILENAME_LEN] = {};
+
     snprintf (path, PATH_LEN, "dump/%s/", dump_name);
-    snprintf (html_filename, HTML_FILENAME_LEN, "%stable.html", path);
-    
+    snprintf (plot_filename, FILENAME_LEN, "%shist.gp", path);
+    snprintf (data_filename, FILENAME_LEN, "%sdata.txt",   path);
+
     create_table_dump_folder (path);
     
-    FILE* html_file = fopen (html_filename, "w");
-    if (!html_file)
+    FILE* data_file = fopen (data_filename, "w");
+    if (!data_file)
     {
         D_PRINT ("ERROR in file openning\n");
         return ERROR;
     }
-    
-    hashtable_histogram (hashtable, html_file);
 
-    if (SIZE_TABLE < 30)
+    FILE* plot_file = fopen (plot_filename, "w");
+    if (!plot_file)
     {
-        counter_reset ();
-        hashtable_png_gen (hashtable, html_file, path );
+        D_PRINT ("ERROR in file openning\n");
+        fclose (data_file);
+        return ERROR;
     }
+
+    hashtable_get_dump_data (hashtable, data_file);
+    make_plot_script (plot_file, data_filename, path);
+
+    char plt_command [COMMAND_LEN] = {};
+
+    snprintf (plt_command, COMMAND_LEN, "gnuplot %s", plot_filename);
+    
+    fclose (plot_file);
+    fclose (data_file);
+
+    if (system (plt_command))
+    {
+        D_PRINT ("ERROR in generating histogram (dump name %s)\n", dump_name);
+        printf("erorr");
+    }
+
+    // if (SIZE_TABLE < 30)
+    // {
+    //     counter_reset ();
+    //     hashtable_png_gen (hashtable, plot_file, path );
+    // }
 
     return SUCCSES;
 }
@@ -54,7 +78,7 @@ error_t hashtable_dump (HashTable* hashtable, const char* dump_name)
 //! Генерация дампа для одного из хэшей
 void hashtable_png_gen (HashTable* hashtable, FILE* html_file, char* path)
 {
-    for (int i = 0; i < SIZE_TABLE; i++)
+    for (int i = 0; i < hashtable->size; i++)
     {
         fprintf (html_file, "<pre>\n<font size=\"6\">\n"
                             "============================================ HASHTALBE [%d] ======================================================\n\n", i);
@@ -94,119 +118,47 @@ error_t create_table_dump_folder (const char* path)
 
 // ===================================================== ГЕНЕРАЦИЯ ГИСТОГРАММЫ =========================================================
 
-//! Генерация гистограммы
-error_t hashtable_histogram (HashTable* hashtable, FILE* html_file)
+error_t make_plot_script (FILE* plot_file, const char* data_filename, const char* path)
 {
-    if (!hashtable || !html_file)
+    if (!plot_file || !data_filename || !path)
+    {
+        D_PRINT ("ERROR plot_file or data_filename or path == NULL\n");
+        return ERROR; 
+    }
+
+    fprintf (plot_file, "set terminal pngcairo size 2000,600\n"
+                        "set output '%shistogram.png'\n"
+                        "set style fill solid 0.7\n"
+                        "set boxwidth 1.0 relative\n"
+                        "set xlabel \"Списки\"\n"
+                        "set ylabel \"Количество слов\"\n"
+                        "set title \"Гистограмма распределения слов\"\n"
+                        "set grid ytics\n"
+                        "set xtics rotate by -45\n"
+                        "set xrange [0:*]\n"
+                        "set yrange [0:*]\n"
+                        "plot '%s' using 1:2 with impulses lc rgb \"blue\" title \"Хэш-таблица\"\n", 
+                        path, data_filename);
+
+    return SUCCSES;
+}
+
+//! Генерация гистограммы
+error_t hashtable_get_dump_data (HashTable* hashtable, FILE* data_file)
+{
+    if (!hashtable || !data_file)
     {
         D_PRINT ("ERROR hashtable = NULL\n");
         return ERROR;
     }
 
-    size_t max_size = 0;
-    for (int i = 0; i < SIZE_TABLE; i++)
-    {
-        if (hashtable->hash[i].size > max_size)
-            max_size = hashtable->hash[i].size;
-    }
+    for (int i = 0; i < hashtable->size; i++)
+        fprintf (data_file, "%d %zu\n",i , hashtable->hash[i].size);
 
-    if (max_size == 0) max_size = 1;
+    char plt_command [COMMAND_LEN] = {};
 
-    fprintf (html_file, "<!DOCTYPE html>\n"
-                        "<html>\n"
-                        "<head>\n"
-                        "\t<style>\n"
-                        "\t\tbody {\n"
-                        "\t\t\tfont-family: Arial;\n"
-                        "\t\t\tmargin: 20px;\n"
-                        "\t\t}\n"
-                        "\t\t.histogram-wrapper {\n"
-                        "\t\t\toverflow-x: auto;\n"
-                        "\t\t\twidth: 100%%;\n"
-                        "\t\t\tborder: 1px solid #ccc;\n"
-                        "\t\t\tpadding: 15px;\n"
-                        "\t\t\tbackground: #f9f9f9;\n"
-                        "\t\t}\n"
-                        "\t\t.histogram {\n"
-                        "\t\t\tdisplay: flex;\n"
-                        "\t\t\talign-items: flex-end;\n"
-                        "\t\t\tgap: 2px;\n"
-                        "\t\t\tmin-width: max-content;\n"
-                        "\t\t\theight: 500px;\n"
-                        "\t\t\tborder-bottom: 2px solid #333;\n"
-                        "\t\t}\n"
-                        "\t\t.bar {\n"
-                        "\t\t\twidth: 12px;\n"
-                        "\t\t\tbackground: #4682b4;\n"
-                        "\t\t\tborder-radius: 3px 3px 0 0;\n"
-                        "\t\t\ttransition: all 0.2s;\n"
-                        "\t\t}\n"
-                        "\t\t.bar:hover {\n"
-                        "\t\t\tbackground: #ff6347;\n"
-                        "\t\t}\n"
-                        "\t\t.label {\n"
-                        "\t\t\twidth: 12px;\n"
-                        "\t\t\ttext-align: center;\n"
-                        "\t\t\tfont-size: 8px;\n"
-                        "\t\t\tcolor: #666;\n"
-                        "\t\t}\n"
-                        "\t\t.labels {\n"
-                        "\t\t\tdisplay: flex;\n"
-                        "\t\t\tgap: 2px;\n"
-                        "\t\t\tmargin-top: 5px;\n"
-                        "\t\t}\n"
-                        "\t\t.stats {\n"
-                        "\t\t\tmargin-bottom: 15px;\n"
-                        "\t\t\tpadding: 10px;\n"
-                        "\t\t\tbackground: #e8f0fe;\n"
-                        "\t\t\tborder-radius: 5px;\n"
-                        "\t\t}\n"
-                        "\t</style>\n"
-                        "</head>\n");
-
-    fprintf (html_file, "<body>\n"
-                        "\t<div class=\"stats\">\n"
-                        "\t\t<strong> Хеш-таблица:</strong> %d списков. "
-                        "Макс %zu элементов\n"
-                        "\t</div>\n",
-                        SIZE_TABLE, max_size);
-
-    fprintf (html_file, "\t<div class=\"histogram-wrapper\">\n"
-                        "\t\t<div class=\"histogram\">\n");
     
-    for (int i = 0; i < SIZE_TABLE; i++)
-    {
-        int height = (max_size > 0) ? 
-                     (hashtable->hash[i].size * 280) / max_size : 0;
 
-        if (height == 0 && hashtable->hash[i].size > 0) height = 2;
-        
-        fprintf (html_file, "\t\t\t<div class=\"bar\" style=\"height: %dpx;\" "
-                          "title=\"Список %d: %zu элементов\"></div>\n", 
-                 height, i, hashtable->hash[i].size);
-    }                 
-    
-    fprintf (html_file, "\t\t</div>\n"
-                        "\t\t<div class=\"labels\">\n");
-
-    for (int i = 0; i < SIZE_TABLE; i++)
-    {
-        if (SIZE_TABLE > 100)
-        {
-            if (i % 50 == 0 || i == SIZE_TABLE - 1)
-                fprintf (html_file, "\t\t\t<div class=\"label\">%d</div>\n", i);
-            
-            else fprintf (html_file, "\t\t\t<div class=\"label\"></div>\n");
-        } 
-        
-        else fprintf (html_file, "\t\t\t<div class=\"label\">%d</div>\n", i);
-    }
-
-    fprintf (html_file, "\t\t</div>\n"
-                        "\t</div>\n"
-                        "</body>\n"
-                        "</html>\n");
-    
     return SUCCSES;
 }
 
